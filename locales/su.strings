@@ -65,7 +65,7 @@
 "save" = "Сохранить";
 "main_information" = "Основная информация";
 "nickname" = "Прозвище";
-"online" = "Онлайн";
+"online" = "На связи";
 "was_online" = "заходил в орган";
 "was_online_m" = "заходил в орган";
 "was_online_f" = "заходила в орган";
@@ -822,10 +822,10 @@
 "about_users_many" = "<b>$1</b> гражданинов";
 "about_users_other" = "<b>$1</b> гражданинов";
 
-"about_online_users_one" = "<b>1</b> пользователь в сети";
-"about_online_users_few" = "<b>$1</b> пользователя в сети";
-"about_online_users_many" = "<b>$1</b> гражданинов в сети";
-"about_online_users_other" = "<b>$1</b> гражданинов в сети";
+"about_online_users_one" = "<b>1</b> гражданин на связи";
+"about_online_users_few" = "<b>$1</b> гражданинов на связи";
+"about_online_users_many" = "<b>$1</b> гражданинов на связи";
+"about_online_users_other" = "<b>$1</b> гражданинов на связи";
 
 "about_active_users_one" = "<b>1</b> активный пользователь";
 "about_active_users_few" = "<b>$1</b> активных пользователя";
@@ -886,3 +886,5 @@
 "instance_links" = "Ссылки страны:";
 
 "my_apps" = "Досуг и отдых";
+
+"friends_online" = "Товарищи на связи";
