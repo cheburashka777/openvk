@@ -1,160 +1,195 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
+
 namespace openvk\VKAPI\Handlers;
-use openvk\Web\Models\Entities\User;
+
 use openvk\Web\Models\Repositories\Users as UsersRepo;
 
 final class Friends extends VKAPIRequestHandler
 {
-	function get(int $user_id, string $fields = "", int $offset = 0, int $count = 100): object
-	{
-		$i = 0;
-		$offset++;
-		$friends = [];
+    public function get(int $user_id = 0, string $fields = "", int $offset = 0, int $count = 100): object
+    {
+        $i = 0;
+        $offset++;
+        $friends = [];
 
-		$users = new UsersRepo;
+        $users = new UsersRepo();
 
-		$this->requireUser();
-		
-		foreach ($users->get($user_id)->getFriends($offset, $count) as $friend) {
-			$friends[$i] = $friend->getId();
-			$i++;
-		}
+        $this->requireUser();
 
-		$response = $friends;
+        if ($user_id == 0) {
+            $user_id = $this->getUser()->getId();
+        }
 
-		$usersApi = new Users($this->getUser());
+        $user = $users->get($user_id);
 
-		if (!is_null($fields)) {
-			$response = $usersApi->get(implode(',', $friends), $fields, 0, $count);  // FIXME
-		}
+        if (!$user || $user->isDeleted()) {
+            $this->fail(100, "Invalid user");
+        }
 
-		return (object) [
-			"count" => $users->get($user_id)->getFriendsCount(),
-			"items" => $response
-		];
-	}
+        if (!$user->getPrivacyPermission("friends.read", $this->getUser())) {
+            $this->fail(15, "Access denied: this user chose to hide his friends.");
+        }
 
-	function getLists(): object
-	{
-		$this->requireUser();
+        foreach ($user->getFriends($offset, $count) as $friend) {
+            $friends[$i] = $friend->getId();
+            $i++;
+        }
 
-		return (object) [
-			"count" => 0,
-			"items" => (array)[]
-		];
-	}
+        $response = $friends;
 
-	function deleteList(): int
-	{
-		$this->requireUser();
+        $usersApi = new Users($this->getUser());
 
-		return 1;
-	}
+        if (!is_null($fields)) {
+            $response = $usersApi->get(implode(',', $friends), $fields, 0, $count);
+        }  # FIXME
 
-	function edit(): int
-	{
-		$this->requireUser();
+        return (object) [
+            "count" => $users->get($user_id)->getFriendsCount(),
+            "items" => $response,
+        ];
+    }
 
-		return 1;
-	}
+    public function getLists(): object
+    {
+        $this->requireUser();
 
-	function editList(): int
-	{
-		$this->requireUser();
+        return (object) [
+            "count" => 0,
+            "items" => (array) [],
+        ];
+    }
 
-		return 1;
-	}
+    public function deleteList(): int
+    {
+        $this->requireUser();
 
-	function add(string $user_id): int
-	{
-		$this->requireUser();
+        return 1;
+    }
 
-		$users = new UsersRepo;
+    public function edit(): int
+    {
+        $this->requireUser();
 
-		$user = $users->get(intval($user_id));
-		
-		if(is_null($user)){
-			$this->fail(177, "Cannot add this user to friends as user not found");
-		} else if($user->getId() == $this->getUser()->getId()) {
-			$this->fail(174, "Cannot add user himself as friend");
-		}
+        return 1;
+    }
 
-		switch ($user->getSubscriptionStatus($this->getUser())) {
-			case 0:
-				$user->toggleSubscription($this->getUser());
-				return 1;
-				break;
+    public function editList(): int
+    {
+        $this->requireUser();
 
-			case 1:
-				$user->toggleSubscription($this->getUser());
-				return 2;
-				break;
+        return 1;
+    }
 
-			case 3:
-				return 2;
-				break;
-			
-			default:
-				return 1;
-				break;
-		}
-	}
+    public function add(string $user_id): int
+    {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
 
-	function delete(string $user_id): int
-	{
-		$this->requireUser();
+        $users = new UsersRepo();
+        $user  = $users->get(intval($user_id));
 
-		$users = new UsersRepo;
+        if (is_null($user)) {
+            $this->fail(177, "Cannot add this user to friends as user not found");
+        } elseif ($user->getId() == $this->getUser()->getId()) {
+            $this->fail(174, "Cannot add user himself as friend");
+        }
 
-		$user = $users->get(intval($user_id));
+        switch ($user->getSubscriptionStatus($this->getUser())) {
+            case 0:
+                $user->toggleSubscription($this->getUser());
+                return 1;
 
-		switch ($user->getSubscriptionStatus($this->getUser())) {
-			case 3:
-				$user->toggleSubscription($this->getUser());
-				return 1;
-				break;
-			
-			default:
-				fail(15, "Access denied: No friend or friend request found.");
-				break;
-		}
-	}
+            case 1:
+                $user->toggleSubscription($this->getUser());
+                return 2;
 
-	function areFriends(string $user_ids): array
-	{
-		$this->requireUser();
+            case 3:
+                return 2;
 
-		$users = new UsersRepo;
+            default:
+                return 1;
+        }
+    }
 
-		$friends = explode(',', $user_ids);
+    public function delete(string $user_id): int
+    {
+        $this->requireUser();
+        $this->willExecuteWriteAction();
 
-		$response = [];
+        $users = new UsersRepo();
 
-		for ($i=0; $i < sizeof($friends); $i++) { 
-			$friend = $users->get(intval($friends[$i]));
+        $user = $users->get(intval($user_id));
 
-			$status = 0;
-			switch ($friend->getSubscriptionStatus($this->getUser())) {
-				case 3:
-				case 0:
-					$status = $friend->getSubscriptionStatus($this->getUser());
-					break;
-				
-				case 1:
-					$status = 2;
-					break;
+        switch ($user->getSubscriptionStatus($this->getUser())) {
+            case 3:
+                $user->toggleSubscription($this->getUser());
+                return 1;
 
-				case 2:
-					$status = 1;
-					break;
-			}
+            default:
+                $this->fail(15, "Access denied: No friend or friend request found.");
+        }
+    }
 
-			$response[] = (object)[
-				"friend_status" => $friend->getSubscriptionStatus($this->getUser()),
-				"user_id" => $friend->getId()
-			];
-		}
+    public function areFriends(string $user_ids): array
+    {
+        $this->requireUser();
 
-		return $response;
-	}
+        $users = new UsersRepo();
+
+        $friends = explode(',', $user_ids);
+
+        $response = [];
+
+        for ($i = 0; $i < sizeof($friends); $i++) {
+            $friend = $users->get(intval($friends[$i]));
+
+            $response[] = (object) [
+                "friend_status" => $friend->getSubscriptionStatus($this->getUser()),
+                "user_id" 		=> $friend->getId(),
+            ];
+        }
+
+        return $response;
+    }
+
+    public function getRequests(string $fields = "", int $out = 0, int $offset = 0, int $count = 100, int $extended = 0): object
+    {
+        if ($count >= 1000) {
+            $this->fail(100, "One of the required parameters was not passed or is invalid.");
+        }
+
+        $this->requireUser();
+
+        $i = 0;
+        $offset++;
+        $followers = [];
+
+        if ($out != 0) {
+            foreach ($this->getUser()->getFollowers($offset, $count) as $follower) {
+                $followers[$i] = $follower->getId();
+                $i++;
+            }
+        } else {
+            foreach ($this->getUser()->getRequests($offset, $count) as $follower) {
+                $followers[$i] = $follower->getId();
+                $i++;
+            }
+        }
+
+        $response = $followers;
+        $usersApi = new Users($this->getUser());
+
+        $response = $usersApi->get(implode(',', $followers), $fields, 0, $count);
+
+        foreach ($response as $user) {
+            $user->user_id = $user->id;
+        }
+
+        return (object) [
+            "count" => $this->getUser()->getFollowersCount(),
+            "items" => $response,
+        ];
+    }
 }

@@ -1,18 +1,32 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
+
 namespace openvk\Web\Presenters;
 
 final class NotificationPresenter extends OpenVKPresenter
 {
-    function renderFeed(): void
+    protected $presenterName = "notification";
+
+    public function renderFeed(): void
     {
         $this->assertUserLoggedIn();
-        
+
         $archive = $this->queryParam("act") === "archived";
-        $this->template->mode     = $archive ? "archived" : "new";
+        $count   = $this->user->identity->getNotificationsCount($archive);
+
+        if ($count == 0 && $this->queryParam("act") == null) {
+            $mode = "archived";
+            $archive = true;
+        } else {
+            $mode = $archive ? "archived" : "new";
+        }
+
+        $this->template->mode     = $mode;
         $this->template->page     = (int) ($this->queryParam("p") ?? 1);
         $this->template->iterator = iterator_to_array($this->user->identity->getNotifications($this->template->page, $archive));
-        $this->template->count    = $this->user->identity->getNotificationsCount($archive);
-        
+        $this->template->count    = $count;
+
         $this->user->identity->updateNotificationOffset();
         $this->user->identity->save();
     }
